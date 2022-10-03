@@ -31,7 +31,7 @@ jobs:
       - name: Install Kubernetes KinD
         run: |
           mkdir -p $HOME/.kube/
-          $HOME/.arkade/bin/kind create cluster
+          kind create cluster
       - name: Wait for nodes to be ready
         run: |
           for i in {1..10};
