@@ -26,8 +26,8 @@ jobs:
                 faas-cli \
                 kubectl \
                 kind
-            chmod +x ./.arkade/bin/*
-            sudo mv ./.arkade/bin/* /usr/local/bin/
+            chmod +x $HOME/.arkade/bin/*
+            sudo -E mv $HOME/.arkade/bin/* /usr/local/bin/
       - name: Install Kubernetes KinD
         run: |
           mkdir -p $HOME/.kube/
