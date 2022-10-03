@@ -65,16 +65,17 @@ jobs:
         run: |
             kubectl port-forward -n openfaas svc/gateway 8080:8080 &
 
-            for i in {1..10};
-            do
-                curl -f -s http://127.0.0.1:8080/healthz -o /dev/null
-                RET=$?
+            attempt_counter=0
+            max_attempts=10
 
-                if [ "$RET" -eq 0 ];
-                then
-                    echo "OpenFaaS gateway ready"
-                    break
+            until $(curl --output /dev/null --silent --fail http://127.0.0.1:8080/healthz ); do
+                if [ ${attempt_counter} -eq ${max_attempts} ];then
+                echo "Max attempts reached"
+                exit 1
                 fi
+
+                printf '.'
+                attempt_counter=$(($attempt_counter+1))
                 sleep 1
             done
       - name: Login to OpenFaaS gateway and deploy a function
