@@ -36,7 +36,7 @@ jobs:
         run: |
           for i in {1..10};
           do
-            retVal=$(kubectl wait --for=condition=ready node --all --timeout=300s || echo -n "retry")
+            retVal=$((kubectl wait --for=condition=ready node --all --timeout=300s | grep "condition met" -c) || echo -n "retry")
 
             if [ "$retVal" -nq "retry" ];
             then
@@ -61,13 +61,35 @@ jobs:
         run: |
             kubectl rollout status -n openfaas deploy/prometheus --timeout 5m
             kubectl rollout status -n openfaas deploy/gateway --timeout 5m
+      - name: Port forward the gateway
+        run: |
+            kubectl port-forward -n openfaas svc/gateway 8080:8080 &
+
+            for i in {1..10};
+            do
+                curl -f -s http://127.0.0.1:8080/healthz -o /dev/null
+                RET=$?
+
+                if [ "$RET" -eq 0 ];
+                then
+                    echo "OpenFaaS gateway ready"
+                    break
+                fi
+                sleep 1
+            done
       - name: Login to OpenFaaS gateway and deploy a function
         run: |
-           kubectl port-forward -n openfaas svc/gateway 8080:8080 &
            PASSWORD=$(kubectl get secret -n openfaas basic-auth -o jsonpath="{.data.basic-auth-password}" | base64 --decode; echo)
            echo -n $PASSWORD | faas-cli login --username admin --password-stdin 
 
            faas-cli store deploy env
 
            faas-cli invoke env <<< ""
-           
+
+           curl http://127.0.0.1:8080/function/env
+
+           faas-cli invoke --async env <<< ""
+
+           kubectl logs -n openfaas deploy/queue-worker
+
+           faas-cli describe env
