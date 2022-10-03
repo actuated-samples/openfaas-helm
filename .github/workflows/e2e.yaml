@@ -1,0 +1,73 @@
+name: e2e
+
+on:
+  push:
+    branches:
+      - '*'
+  pull_request:
+    branches:
+      - '*'
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: actuated
+    steps:
+      - uses: actions/checkout@master
+        with:
+          fetch-depth: 1
+      - name: Get latest developer tools
+        run: |
+            curl -sLSf https://get.arkade.dev | sudo sh
+            arkade get \
+                faas-cli \
+                kubectl \
+                kind
+            chmod +x ./.arkade/bin/*
+            sudo mv ./.arkade/bin/* /usr/local/bin/
+      - name: Install Kubernetes KinD
+        run: |
+          mkdir -p $HOME/.kube/
+          $HOME/.arkade/bin/kind create cluster
+      - name: Wait for nodes to be ready
+        run: |
+          for i in {1..10};
+          do
+            retVal=$(kubectl wait --for=condition=ready node --all --timeout=300s || echo -n "retry")
+
+            if [ "$retVal" -nq "retry" ];
+            then
+              echo "Node ready"
+              break
+            fi
+            sleep 2
+          done
+      - name: Add Helm chart, update repos and apply namespaces
+        run: |
+            kubectl apply -f https://raw.githubusercontent.com/openfaas/faas-netes/master/namespaces.yml
+            helm repo add openfaas https://openfaas.github.io/faas-netes/
+            helm repo update
+      - name: Install the Community Edition (CE)
+        run: |
+            helm repo update \
+            && helm upgrade openfaas --install openfaas/openfaas \
+                --namespace openfaas  \
+                --set functionNamespace=openfaas-fn \
+                --set generateBasicAuth=true
+      - name: Wait until OpenFaaS is ready
+        run: |
+            kubectl rollout status -n openfaas deploy/prometheus --timeout 5m
+            kubectl rollout status -n openfaas deploy/gateway --timeout 5m
+      - name: Login to OpenFaaS gateway and deploy a function
+        run: |
+           kubectl port-forward -n openfaas svc/gateway 8080:8080 &
+           PASSWORD=$(kubectl get secret -n openfaas basic-auth -o jsonpath="{.data.basic-auth-password}" | base64 --decode; echo)
+           echo -n $PASSWORD | faas-cli login --username admin --password-stdin 
+
+           faas-cli store deploy env
+
+           faas-cli invoke env <<< ""
+           
