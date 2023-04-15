@@ -7,11 +7,7 @@ on:
   pull_request:
     branches:
       - '*'
-
-permissions:
-  actions: read
-  contents: read
-
+  workflow_dispatch:
 
 jobs:
   e2e:
@@ -20,12 +16,12 @@ jobs:
       - uses: actions/checkout@master
         with:
           fetch-depth: 1
-    - uses: alexellis/setup-arkade@v2
-    - uses: alexellis/arkade-get@master
-      with:
-        kubectl: latest
-        faas-cli: latest
-        kind: latest
+      - uses: alexellis/setup-arkade@v2
+      - uses: alexellis/arkade-get@master
+        with:
+          kubectl: latest
+          faas-cli: latest
+          kind: latest
       - name: Install Kubernetes KinD
         run: |
           mkdir -p $HOME/.kube/
