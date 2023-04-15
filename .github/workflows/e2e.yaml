@@ -32,7 +32,7 @@ jobs:
       - name: Install Kubernetes KinD
         run: |
           mkdir -p $HOME/.kube/
-          kind create cluster
+          kind create cluster --wait 5
       - name: Wait for nodes to be ready
         run: |
           for i in {1..10};
